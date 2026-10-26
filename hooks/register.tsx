@@ -107,6 +107,39 @@ async function loadWorkspace($: EngineInterface): Promise<Workspace> {
   }
 }
 
+const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const FETCH_EVERY_MS = 5 * 60_000 // ถาม server จริงไม่เกินทุก 5 นาที (ถี่กว่านี้โดนสั่งพัก)
+
+// ดึงตัวเลข Usage เองด้วยการล็อกอินของ Claude Code (แผงไม่เห็นรหัสเลย ระบบใส่ให้ตอนส่ง)
+// ใช้ไฟล์ cache เดียวกับ VS Code extension: ทุกแชต/ทุกหน้าต่างแชร์ผลกัน ไม่ถามซ้ำ
+async function refreshUsage($: EngineInterface): Promise<void> {
+  const home = await $.env.get('HOME')
+  const file = `${home}/.claude/usage-cache.json`
+  let raw: { data?: unknown; fetchedAt?: number; backoffUntil?: number } = {}
+  try {
+    raw = JSON.parse(await $.fs.read(file))
+  } catch {
+    // ยังไม่มีไฟล์ → ดึงครั้งแรก
+  }
+  const now = Date.now()
+  if ((raw.backoffUntil ?? 0) > now) return
+  if (raw.data && now - (raw.fetchedAt ?? 0) < FETCH_EVERY_MS - 5_000) return
+  try {
+    const auth = (await $.session.authorize())?.handle
+    if (!auth) return // ไม่ได้ล็อกอินแบบบัญชี Claude (เช่นใช้ API key) → endpoint นี้ใช้ไม่ได้
+    const res = await $.http.fetch(USAGE_URL, { auth, headers: { 'anthropic-beta': 'oauth-2025-04-20' } })
+    if (res.ok) {
+      await $.fs.write(file, JSON.stringify({ data: JSON.parse(res.text), fetchedAt: Date.now(), backoffUntil: 0 }))
+      return
+    }
+    // 429 = ถามถี่ไป ทำตามเวลาที่ server บอก · error อื่นพัก 5 นาที (ไม่ยิงซ้ำทุก 30 วินาที)
+    const wait = res.status === 429 ? Number(res.headers['retry-after']) || 300 : 300
+    await $.fs.write(file, JSON.stringify({ ...raw, backoffUntil: Date.now() + wait * 1000 }))
+  } catch {
+    // เน็ตหลุด/อื่น ๆ → ใช้ตัวเลขเดิมไปก่อน รอบหน้าค่อยลองใหม่
+  }
+}
+
 // อ่านไฟล์ cache แล้วแปลงเป็นข้อมูลที่แผงใช้
 async function load($: EngineInterface): Promise<Usage> {
   try {
@@ -278,6 +311,7 @@ export const register: Register = on => {
 
     // อ่านไฟล์ใหม่ทุก 30 วินาที (อ่านจากไฟล์ในเครื่อง ไม่เรียก server)
     $.clock.every(REFRESH_MS, async () => {
+      await refreshUsage($)
       const fresh = await load($)
       await update($, usage, () => fresh)
       const ws = await loadWorkspace($)
@@ -291,6 +325,7 @@ export const register: Register = on => {
       const t = await read($, turn)
       if (t.startedAt !== null) await update($, turn, old => ({ ...old, now: Date.now() }))
     })
+    await refreshUsage($)
     const first = await load($)
     await update($, usage, () => first)
     const firstWs = await loadWorkspace($)
@@ -411,7 +446,7 @@ export const register: Register = on => {
         </Box>
       ) : (
         <Box flexDirection="column" width="100%">
-          <Text color={MUTED}>No usage data. Install the VS Code extension "Claude Usage Limit", then reload.</Text>
+          <Text color={MUTED}>No usage data yet. It needs a Claude account login (not an API key); numbers refresh every 5 min.</Text>
           {contextMeter}
         </Box>
       ),
