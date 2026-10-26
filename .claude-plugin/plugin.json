@@ -1,0 +1,6 @@
+{
+  "name": "usage-pane",
+  "version": "0.1.0",
+  "description": "Claude Code Panel: 5-hour & weekly usage limits, context, git status, task progress and a pixel chick mascot",
+  "types": "./types/index.d.ts"
+}

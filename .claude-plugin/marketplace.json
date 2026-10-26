@@ -1,0 +1,12 @@
+{
+  "name": "claude-code-panel",
+  "owner": {
+    "name": "phatblr"
+  },
+  "plugins": [
+    {
+      "name": "usage-pane",
+      "source": "./"
+    }
+  ]
+}

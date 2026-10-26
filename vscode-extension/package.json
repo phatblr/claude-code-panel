@@ -1,0 +1,38 @@
+{
+  "name": "claude-usage-limit",
+  "displayName": "Claude Usage Limit",
+  "description": "Shows Claude's 5-hour and weekly usage limits in the VS Code status bar",
+  "version": "0.2.1",
+  "publisher": "phatblr",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeUsage.refresh",
+        "title": "Claude Usage: Refresh"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Usage Limit",
+      "properties": {
+        "claudeUsage.refreshSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 120,
+          "description": "How often to fetch new numbers, in seconds"
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/phatblr/claude-code-panel"
+  }
+}
