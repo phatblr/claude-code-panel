@@ -336,7 +336,7 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // พี่ส่งข้อความ → เริ่มจับเวลาเทิร์นนี้
+  // ผู้ใช้ส่งข้อความ → เริ่มจับเวลาเทิร์นนี้
   on('prompt.submit', async ($, e, next) => {
     const now = await $.clock.now()
     await update($, turn, old => ({ ...old, startedAt: now, now }))
